@@ -73,7 +73,7 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         #print(self.df['ID'])
         ID = self.df['ID'].iloc[[index]]
         n_sources = self.df['n_sources'].iloc[[index]]
-        channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']
+        channel_names = [ ]
         # filepath = "/media/joshua/HDD_fun2/Public/EUC_Y/imageEUC_Y-" + str(ID.values[0]) + ".fits"
         # lens_data = fits.open(filepath)
         # img = lens_data[0].data
@@ -154,6 +154,9 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             gc.collect()
+            # if batch_idx % 2 == 0 and batch_idx != 0:
+            #     #tb.add_scalar('test_loss', loss.item())
+            #     break
 
         # Collect RMS over each label
         avg_rms = total_rms / (total_counter)
@@ -171,7 +174,7 @@ if __name__ == '__main__':
             total_counter = 0
             total_rms = 0
 
-            test_loader = torch.utils.data.DataLoader(EHTDataset(root_folder, train=False, transform=data_transform, target_transform=target_transform),
+            test_loader = torch.utils.data.DataLoader(LensDataset(root_folder, train=False, transform=data_transform, target_transform=target_transform),
                         batch_size = glo_batch_size, shuffle = True
                         )
 
