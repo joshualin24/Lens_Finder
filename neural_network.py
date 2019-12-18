@@ -73,7 +73,7 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         #print(self.df['ID'])
         ID = self.df['ID'].iloc[[index]]
         n_sources = self.df['n_sources'].iloc[[index]]
-        channel_names = [ ]
+        channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']
         # filepath = "/media/joshua/HDD_fun2/Public/EUC_Y/imageEUC_Y-" + str(ID.values[0]) + ".fits"
         # lens_data = fits.open(filepath)
         # img = lens_data[0].data
