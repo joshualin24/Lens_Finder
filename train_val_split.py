@@ -18,7 +18,8 @@ root_folder = "/media/joshua/HDD_fun2/Public/"
 
 #train_folder = "train/"
 #test_folder = "test/"
-full_data = pd.read_csv(root_folder + "image_catalog2.0train.csv" , skiprows=28)
+#full_data = pd.read_csv(root_folder + "image_catalog2.0train.csv" , skiprows=28)
+full_data = pd.read_csv(root_folder + "image_catalog2.0train_v2.csv", header = 0)
 #full_data.to_csv("./Full_train/clean_full_data.csv")
 #print(full_data)
 
@@ -31,7 +32,7 @@ full_data = pd.read_csv(root_folder + "image_catalog2.0train.csv" , skiprows=28)
 
 train, val =  train_test_split(full_data, test_size=0.2, random_state=42)
 
-#print(full_data.tail(), full_data.shape)
+print(full_data.tail(), full_data.shape)
 print(train.head())
 print(val.shape)
 #
