@@ -80,19 +80,21 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         image = np.zeros((4, 224, 224))
         try:
             for i, channel in enumerate(channel_names):
+
                 filepath = self.path + channel + "/image" + channel + "-" + str(ID.values[0]) + ".fits"
                 lens_data = fits.open(filepath)
                 img = lens_data[0].data
+                img *= 10e8
                 img_channel_0 = scipy.ndimage.zoom(img, 224/img.shape[0], order=1)
                 image[i, :, :] += img_channel_0
-            #pass
         except:
             print("error", ID)
             pass
-        #     plt.subplot(1, 4, i+ 1)
-        #     plt.imshow(image[i, :, :])
-        #     plt.title(channel + str(n_sources.values[0]))
-        # plt.show()
+
+
+
+        # if self.transform is not None:
+        #     image = self.transform(image)
 
         return image, n_sources.values[0]
 
@@ -140,13 +142,18 @@ if __name__ == '__main__':
             data, target = data.float(), n_sources.float()
             data, target = Variable(data).cuda(), Variable(target).cuda()
             data, target = data, target.unsqueeze(1)
+            #print("data shape", data.shape)
+            #print("data", sum(sum(data)))
+            # plt.imshow(data.data.cpu().numpy()[0,0,:,:])
+            # plt.colorbar()
+            # plt.show()
             #print("target:",target)
             optimizer.zero_grad()
             output = net(data)
             #print("output:", output)
             loss = loss_fn(output, target)
-
-            square_diff = (output - target) #((output - target)**2)**(0.5)
+            m = nn.Sigmoid()
+            square_diff = (m(output) - target) #((output - target)**2)**(0.5)
             total_rms += square_diff.std(dim=0)
             total_loss += loss.item()
             total_counter += 1
@@ -193,7 +200,8 @@ if __name__ == '__main__':
                 #pred [batch, out_caps_num, out_caps_size, 1]
                 pred = net(data)
                 loss = loss_fn(pred, target)
-                square_diff = (pred - target)
+                m = nn.Sigmoid()
+                square_diff = (m(pred) - target)
                 total_rms += square_diff.std(dim=0)
                 total_loss += loss.item()
                 total_counter += 1
