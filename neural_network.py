@@ -35,8 +35,8 @@ from astropy import units as u
 from sklearn.model_selection import train_test_split
 
 
-
-root_folder = "/media/joshua/HDD_fun2/Public/"
+print(os.getcwd())
+root_folder = "/home/zjin16/Strong_Lens_Finder/data/Public/"
 save_model_path = './saved_model/'
 
 
@@ -62,11 +62,11 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
 
         if self.train:
             self.path = root_dir#os.path.join(self.root_dir, self.train_folder)
-            self.df = pd.read_csv(self.path + '/train.csv')
+            self.df = pd.read_csv(self.path + 'train.csv')
 
         else:
             self.path = root_dir#os.path.join(self.root_dir, self.test_folder)
-            self.df = pd.read_csv(self.path + '/val.csv')
+            self.df = pd.read_csv(self.path + 'val.csv')
 
     def __getitem__(self, index):
 
@@ -78,6 +78,7 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         # lens_data = fits.open(filepath)
         # img = lens_data[0].data
         image = np.zeros((4, 224, 224))
+
         try:
             for i, channel in enumerate(channel_names):
 
@@ -90,6 +91,8 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         except:
             print("error", ID)
             pass
+
+
 
 
 
