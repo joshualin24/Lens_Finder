@@ -1,4 +1,4 @@
-#### 2019.12.17 at Office
+#### 2019.12.26 at Zehao
 
 import torch
 import torch
@@ -41,6 +41,7 @@ save_model_path = './saved_model/'
 
 
 EPOCH = 40
+#EPOCH = 1
 glo_batch_size = 50
 test_num_batch = 50
 
@@ -50,6 +51,7 @@ data_transform = transforms.Compose([
             normalize,
             ])
 target_transform = torch.Tensor
+datastd=np.array([0.915833478313607,2.343014096022202]) ##n_source_im.std,mag_eff.std
 
 
 class LensDataset(Dataset): # torch.utils.data.Dataset
@@ -72,8 +74,16 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
 
         #print(self.df['ID'])
         ID = self.df['ID'].iloc[[index]]
-        n_sources = self.df['n_sources'].iloc[[index]]
+        n_source_im = self.df['n_source_im'].iloc[[index]]
+        mag_eff = self.df['mag_eff'].iloc[[index]]
+        #print(mag_eff.values)
+        #print(mag_eff.values.shape)
+        if np.isnan(mag_eff.values[0])==True:
+            mag_eff.values[0] = 0.0
+        if np.isnan(n_source_im.values[0])==True:
+            n_source_im.values[0] = 0.0
         channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']
+        y=np.array([n_source_im.values[0], mag_eff.values[0]])
         # filepath = "/media/joshua/HDD_fun2/Public/EUC_Y/imageEUC_Y-" + str(ID.values[0]) + ".fits"
         # lens_data = fits.open(filepath)
         # img = lens_data[0].data
@@ -99,7 +109,7 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         # if self.transform is not None:
         #     image = self.transform(image)
 
-        return image, n_sources.values[0]
+        return image, y
 
     def __len__(self):
         return self.df.shape[0]
@@ -113,7 +123,7 @@ if __name__ == '__main__':
     if not os.path.exists(save_model_path):
         os.mkdir(save_model_path)
 
-    dset_classes_number = 1
+    dset_classes_number = 2
     num_input_channel = 4
     net = models.resnet18(pretrained=False)
     net.conv1 = nn.Conv2d(num_input_channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
@@ -121,6 +131,7 @@ if __name__ == '__main__':
     #new_num_features = *something bigger than 512*
     net.fc= nn.Linear(in_features=num_ftrs, out_features=dset_classes_number)
     loss_fn = nn.BCEWithLogitsLoss(reduction='elementwise_mean')
+    loss_mse = nn.MSELoss(reduction='none')
 
     net.cuda()
 
@@ -141,10 +152,10 @@ if __name__ == '__main__':
         total_counter = 0
         total_rms = 0
 
-        for batch_idx, (data, n_sources) in enumerate(tqdm(train_loader, total = len(train_loader))):
-            data, target = data.float(), n_sources.float()
+        for batch_idx, (data, y) in enumerate(tqdm(train_loader, total = len(train_loader))):
+            data, target = data.float(), y.float()
             data, target = Variable(data).cuda(), Variable(target).cuda()
-            data, target = data, target.unsqueeze(1)
+            #data, target = data, target.unsqueeze(1)
             #print("data shape", data.shape)
             #print("data", sum(sum(data)))
             # plt.imshow(data.data.cpu().numpy()[0,0,:,:])
@@ -154,9 +165,25 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             output = net(data)
             #print("output:", output)
-            loss = loss_fn(output, target)
-            m = nn.Sigmoid()
-            square_diff = (m(output) - target) #((output - target)**2)**(0.5)
+            #print("target:", target)
+            #print(output.shape)
+            #print(target.shape)
+
+            loss_y = loss_mse(output, target)
+            #print(loss_y.shape,loss_y.dtype)
+            #loss_y=loss_y.sum(0)
+            #loss=loss_y[0]/(datastd[0]*glo_batch_size) + loss_y[1]/(datastd[1]*glo_batch_size)
+            loss=loss_y[:,0]/datastd[0] + loss_y[:,1]/datastd[1]
+            #print(loss.shape)
+            loss = torch.mean(loss)
+            print(loss)
+
+
+
+            #loss = loss_fn(output, target)
+            #m = nn.Sigmoid()
+            #square_diff = (m(output) - target) #((output - target)**2)**(0.5)
+            square_diff = (output - target)
             total_rms += square_diff.std(dim=0)
             total_loss += loss.item()
             total_counter += 1
@@ -192,19 +219,20 @@ if __name__ == '__main__':
             #     data, target = data.float(), mdot.float()
             #     data, target = Variable(data).cuda(), Variable(target).cuda()
             #     data, target = data, target.unsqueeze(1)
-            for batch_idx, (data, n_sources) in enumerate(test_loader):
-                data, target = data.float(), n_sources.float()
+            for batch_idx, (data, y) in enumerate(test_loader):
+                data, target = data.float(), y.float()
                 data, target = Variable(data).cuda(), Variable(target).cuda()
-                data, target = data, target.unsqueeze(1)
-
-
-
+                #data, target = data, target.unsqueeze(1)
 
                 #pred [batch, out_caps_num, out_caps_size, 1]
                 pred = net(data)
-                loss = loss_fn(pred, target)
-                m = nn.Sigmoid()
-                square_diff = (m(pred) - target)
+                loss_y = loss_mse(pred, target)
+                loss=loss_y[:,0]/datastd[0] + loss_y[:,1]/datastd[1]
+                loss = torch.mean(loss)
+                square_diff = (output - target)
+                #loss = loss_fn(pred, target)
+                #m = nn.Sigmoid()
+                #square_diff = (m(pred) - target)
                 total_rms += square_diff.std(dim=0)
                 total_loss += loss.item()
                 total_counter += 1
@@ -226,7 +254,7 @@ if __name__ == '__main__':
             if total_loss/(total_counter) < best_accuracy:
                 best_accuracy = total_loss/(total_counter)
                 datetime_today = str(datetime.date.today())
-                torch.save(net, save_model_path + datetime_today + 'n_sources_' +'resnet18.mdl')
-                print("saved to " + "n_sources_resnet18.mdl" + " file.")
+                torch.save(net, save_model_path + datetime_today + 'im_mag_eff_' +'resnet18.mdl')
+                print("saved to " + "im_mag_eff_resnet18.mdl" + " file.")
 
 tb.close()
