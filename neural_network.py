@@ -40,18 +40,27 @@ root_folder = "/home/zjin16/Strong_Lens_Finder/data/Public/"
 save_model_path = './saved_model/'
 
 
+#EPOCH = 40
 EPOCH = 40
-#EPOCH = 1
 glo_batch_size = 50
 test_num_batch = 50
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
+'''
 data_transform = transforms.Compose([
             transforms.ToTensor(), # scale to [0,1] and convert to tensor
             normalize,
             ])
+'''
+data_transform = transforms.Compose([
+            transforms.ToTensor(), # scale to [0,1] and convert to tensor
+            normalize,
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomRotation(45),
+            ])
 target_transform = torch.Tensor
-datastd=np.array([0.915833478313607,2.343014096022202]) ##n_source_im.std,mag_eff.std
+datastd=np.array([0.915833478313607,2.4029123249358495,244.70123172849702]) ##n_source_im.std,mag_eff.std,n_pix_source.std
 
 
 class LensDataset(Dataset): # torch.utils.data.Dataset
@@ -76,14 +85,17 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         ID = self.df['ID'].iloc[[index]]
         n_source_im = self.df['n_source_im'].iloc[[index]]
         mag_eff = self.df['mag_eff'].iloc[[index]]
+        n_pix_source = self.df['n_pix_source'].iloc[[index]]
         #print(mag_eff.values)
         #print(mag_eff.values.shape)
         if np.isnan(mag_eff.values[0])==True:
             mag_eff.values[0] = 0.0
         if np.isnan(n_source_im.values[0])==True:
             n_source_im.values[0] = 0.0
+        if np.isnan(n_pix_source.values[0])==True:
+            n_pix_source.values[0] = 0.0
         channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']
-        y=np.array([n_source_im.values[0], mag_eff.values[0]])
+        y=np.array([n_source_im.values[0], mag_eff.values[0],n_pix_source.values[0]])
         # filepath = "/media/joshua/HDD_fun2/Public/EUC_Y/imageEUC_Y-" + str(ID.values[0]) + ".fits"
         # lens_data = fits.open(filepath)
         # img = lens_data[0].data
@@ -123,7 +135,7 @@ if __name__ == '__main__':
     if not os.path.exists(save_model_path):
         os.mkdir(save_model_path)
 
-    dset_classes_number = 2
+    dset_classes_number = 3
     num_input_channel = 4
     net = models.resnet18(pretrained=False)
     net.conv1 = nn.Conv2d(num_input_channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
@@ -173,10 +185,10 @@ if __name__ == '__main__':
             #print(loss_y.shape,loss_y.dtype)
             #loss_y=loss_y.sum(0)
             #loss=loss_y[0]/(datastd[0]*glo_batch_size) + loss_y[1]/(datastd[1]*glo_batch_size)
-            loss=loss_y[:,0]/datastd[0] + loss_y[:,1]/datastd[1]
+            loss=loss_y[:,0]/datastd[0] + loss_y[:,1]/datastd[1] + loss_y[:,2]/datastd[2]
             #print(loss.shape)
             loss = torch.mean(loss)
-            print(loss)
+            #print(loss)
 
 
 
@@ -227,7 +239,7 @@ if __name__ == '__main__':
                 #pred [batch, out_caps_num, out_caps_size, 1]
                 pred = net(data)
                 loss_y = loss_mse(pred, target)
-                loss=loss_y[:,0]/datastd[0] + loss_y[:,1]/datastd[1]
+                loss=loss_y[:,0]/datastd[0] + loss_y[:,1]/datastd[1] + loss_y[:,2]/datastd[2]
                 loss = torch.mean(loss)
                 square_diff = (output - target)
                 #loss = loss_fn(pred, target)
@@ -254,7 +266,7 @@ if __name__ == '__main__':
             if total_loss/(total_counter) < best_accuracy:
                 best_accuracy = total_loss/(total_counter)
                 datetime_today = str(datetime.date.today())
-                torch.save(net, save_model_path + datetime_today + 'im_mag_eff_' +'resnet18.mdl')
-                print("saved to " + "im_mag_eff_resnet18.mdl" + " file.")
+                torch.save(net, save_model_path + datetime_today + 'im_mag_eff_pix_' +'resnet18_lastest.mdl')
+                print("saved to " + "im_mag_eff_pix_resnet18_lastest.mdl" + " file.")
 
 tb.close()
