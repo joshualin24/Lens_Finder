@@ -60,7 +60,7 @@ data_transform = transforms.Compose([
             transforms.RandomRotation(45),
             ])
 target_transform = torch.Tensor
-datastd=np.array([0.915833478313607,2.4029123249358495,244.70123172849702,4.81361636626335e-06]) ##n_source_im.std,mag_eff.std,n_pix_source.std,ein_radius.std
+datastd=np.array([4.81361636626335e-06]) ##n_source_im.std,mag_eff.std,n_pix_source.std
 
 
 class LensDataset(Dataset): # torch.utils.data.Dataset
@@ -83,25 +83,27 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
 
         #print(self.df['ID'])
         ID = self.df['ID'].iloc[[index]]
-        n_source_im = self.df['n_source_im'].iloc[[index]]
-        mag_eff = self.df['mag_eff'].iloc[[index]]
-        n_pix_source = self.df['n_pix_source'].iloc[[index]]
+        #n_source_im = self.df['n_source_im'].iloc[[index]]
+        #mag_eff = self.df['mag_eff'].iloc[[index]]
+        #n_pix_source = self.df['n_pix_source'].iloc[[index]]
 
         ein_radius = self.df['ein_area'].iloc[[index]]
         ein_radius.values[0] = np.sqrt(ein_radius.values[0]/np.pi)
         #print(mag_eff.values)
         #print(mag_eff.values.shape)
+        '''
         if np.isnan(mag_eff.values[0])==True:
             mag_eff.values[0] = 0.0
         if np.isnan(n_source_im.values[0])==True:
             n_source_im.values[0] = 0.0
         if np.isnan(n_pix_source.values[0])==True:
             n_pix_source.values[0] = 0.0
+        '''
         if np.isnan(ein_radius.values[0])==True:
             ein_radius.values[0] = 0.0
 
         channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']
-        y=np.array([n_source_im.values[0], mag_eff.values[0],n_pix_source.values[0],ein_radius.values[0]])
+        y=np.array([ein_radius.values[0]])
         # filepath = "/media/joshua/HDD_fun2/Public/EUC_Y/imageEUC_Y-" + str(ID.values[0]) + ".fits"
         # lens_data = fits.open(filepath)
         # img = lens_data[0].data
@@ -141,7 +143,7 @@ if __name__ == '__main__':
     if not os.path.exists(save_model_path):
         os.mkdir(save_model_path)
 
-    dset_classes_number = 4
+    dset_classes_number = 1
     num_input_channel = 4
     net = models.resnet18(pretrained=False)
     net.conv1 = nn.Conv2d(num_input_channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
@@ -191,9 +193,8 @@ if __name__ == '__main__':
             #print(loss_y.shape,loss_y.dtype)
             #loss_y=loss_y.sum(0)
             #loss=loss_y[0]/(datastd[0]*glo_batch_size) + loss_y[1]/(datastd[1]*glo_batch_size)
-            loss=loss_y[:,0]/datastd[0] + loss_y[:,1]/datastd[1] + loss_y[:,2]/datastd[2] + loss_y[:,3]/datastd[3]
             #print(loss.shape)
-            loss = torch.mean(loss)
+            loss = torch.mean(loss_y)
             #print(loss)
 
 
@@ -245,8 +246,7 @@ if __name__ == '__main__':
                 #pred [batch, out_caps_num, out_caps_size, 1]
                 pred = net(data)
                 loss_y = loss_mse(pred, target)
-                loss=loss_y[:,0]/datastd[0] + loss_y[:,1]/datastd[1] + loss_y[:,2]/datastd[2] + loss_y[:,3]/datastd[3]
-                loss = torch.mean(loss)
+                loss = torch.mean(loss_y)
                 square_diff = (output - target)
                 #loss = loss_fn(pred, target)
                 #m = nn.Sigmoid()
@@ -272,7 +272,7 @@ if __name__ == '__main__':
             if total_loss/(total_counter) < best_accuracy:
                 best_accuracy = total_loss/(total_counter)
                 datetime_today = str(datetime.date.today())
-                torch.save(net, save_model_path + datetime_today + 'im_mag_eff_pix_einradius_' +'resnet18.mdl')
-                print("saved to " + "im_mag_eff_pix_einradius_resnet18.mdl" + " file.")
+                torch.save(net, save_model_path + datetime_today + 'einradius_' +'resnet18_lastest.mdl')
+                print("saved to " + "einradius_resnet18_lastest.mdl" + " file.")
 
 tb.close()

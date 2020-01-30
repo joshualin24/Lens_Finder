@@ -17,7 +17,6 @@ from scipy.ndimage import gaussian_filter
 from scipy.ndimage import rotate
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
-from sklearn.metrics import fbeta_score
 from tqdm import tqdm
 import gc
 import astropy
@@ -25,8 +24,10 @@ from astropy.io import fits
 from astropy.table import Table
 
 
+from sklearn.metrics import fbeta_score
+
 root_folder = "/home/zjin16/Strong_Lens_Finder/data/Public/"
-loaded_model_path = './saved_model/2019-12-27im_mag_eff_resnet18.mdl'
+loaded_model_path = './saved_model/2020-01-27im_mag_eff_pix_einradius_resnet18.mdl'
 
 
 
@@ -47,12 +48,13 @@ target_transform = torch.Tensor
 
 ##
 glo_batch_size = 50
-#test_num_batch = 5
+test_num_batch = 400
 ##
-y_true=np.zeros(glo_batch_size*test_num_batch)
-y_pred=np.zeros(glo_batch_size*test_num_batch)
-threshold=0.5
-beta=np.sqrt(0.001)
+y_true=np.zeros((6,glo_batch_size*test_num_batch))
+y_pred=np.zeros((6,glo_batch_size*test_num_batch))
+
+threshold=np.array([0.80,0.90,0.99,0.80,0.90,0.99])
+#beta=np.sqrt(0.001)
 
 class LensDataset(Dataset): # torch.utils.data.Dataset
     def __init__(self, root_dir, train=True, transform=None, target_transform=None):
@@ -76,15 +78,24 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         ID = self.df['ID'].iloc[[index]]
         n_source_im = self.df['n_source_im'].iloc[[index]]
         mag_eff = self.df['mag_eff'].iloc[[index]]
+        n_pix_source = self.df['n_pix_source'].iloc[[index]]
+
+        ein_radius = self.df['ein_area'].iloc[[index]]
+        ein_radius.values[0] = np.sqrt(ein_radius.values[0]/np.pi)
         #print(mag_eff.values)
         #print(mag_eff.values.shape)
         if np.isnan(mag_eff.values[0])==True:
             mag_eff.values[0] = 0.0
         if np.isnan(n_source_im.values[0])==True:
             n_source_im.values[0] = 0.0
+        if np.isnan(n_pix_source.values[0])==True:
+            n_pix_source.values[0] = 0.0
+        if np.isnan(ein_radius.values[0])==True:
+            ein_radius.values[0] = 0.0
+
         #print('ground truth:(n_source_im, mag_eff)=',n_source_im.values[0],mag_eff.values[0])
         channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']
-        y=np.array([n_source_im.values[0], mag_eff.values[0]])
+        y=np.array([n_source_im.values[0], mag_eff.values[0],n_pix_source.values[0],ein_radius.values[0]])
         # filepath = "/media/joshua/HDD_fun2/Public/EUC_Y/imageEUC_Y-" + str(ID.values[0]) + ".fits"
         # lens_data = fits.open(filepath)
         # img = lens_data[0].data
@@ -121,7 +132,8 @@ test_loader = torch.utils.data.DataLoader(LensDataset(root_folder, train=False, 
 
 net.cuda()
 
-
+criteria_target_list = []
+criteria_output_list = []
 
 
 for batch_idx, (data, ID, y) in enumerate(test_loader):
@@ -138,10 +150,11 @@ for batch_idx, (data, ID, y) in enumerate(test_loader):
     #output = F.sigmoid(output)
 
     #print("prediction:(n_source_im, mag_eff)",output.data.cpu().numpy()) #(1,2) shape when batch size=1,training variable=2
-    for i in range(output.data.cpu().numpy().shape[0]):
+    for i in range(glo_batch_size):
         truth=target.data.cpu().numpy()[i]
         pred=output.data.cpu().numpy()[i]
         ##(n_source_im , mag_eff)
+        '''
         if truth[0] > 0:
             if truth[1] > 1.6:
                 criteria_tru=1.0
@@ -161,37 +174,108 @@ for batch_idx, (data, ID, y) in enumerate(test_loader):
                 criteria_pred=(pred[1]-1.0)*(5.0/3.0)
         if pred[0]<= 0:
             criteria_pred = 0.0
+
         print('groundtruth:(n_source_im, mag_eff)=',truth[0],truth[1])
         print('prediction :(n_source_im, mag_eff)=',pred[0],pred[1])
-        print('criteria(ground truth,prediction)=',criteria_tru,criteria_pred)
+        print('~~~~~criteria~~~~~(ground truth,prediction)=',criteria_tru,criteria_pred)
+        '''
 
-        if criteria_tru>=threshold:
-            y_true[int(batch_idx*glo_batch_size+i)]=1
-        if criteria_pred>=threshold:
-            y_pred[int(batch_idx*glo_batch_size+i)]=1
+        #'''
+        if truth[0] > 0:
+            if truth[1] > 1.6:
+                if truth[2] > 20:
+                    criteria_tru=1.0
+                if truth[2]<= 20:
+                    criteria_tru=0.0
 
-    '''
-    if output.data.cpu().numpy()[0][0] < 0.7:
-        image = np.zeros((4, 224, 224))
-        channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']
-        for i, channel in enumerate(channel_names):
-            filepath = root_folder + channel + "/image" + channel + "-" + str(ID.numpy()[0]) + ".fits"
-            lens_data = fits.open(filepath)
-            img = lens_data[0].data
-            img_channel_0 = scipy.ndimage.zoom(img, 224/img.shape[0], order=1)
-            image[i, :, :] += img_channel_0
-            plt.subplot(1, 4, i+ 1)
-            plt.imshow(image[i, :, :])
-            plt.title(channel + str(n_sources.numpy()[0]))
-        plt.show()
-    '''
-    print("______")
+            if truth[1] < 1.0:
+                criteria_tru=0.0
+            if (truth[1]>=1.0) and (truth[1]<=1.6):
+                if truth[2] > 20:
+                    criteria_tru=(truth[1]-1.0)*(5.0/3.0)
+                if truth[2]<= 20:
+                    criteria_tru=0.0
 
-    #print("flux tpye (prediction):", pred_flux_type)
+        if truth[0]<= 0:
+            criteria_tru = 0.0
 
-    '''
-    if batch_idx >= (test_num_batch-1):
-        break
-    '''
+        if pred[0] > 0:
+            if pred[1] > 1.6:
+                if pred[2] > 20:
+                    criteria_pred=1.0
+                if pred[2]<= 20:
+                    criteria_pred=0.0
 
-print('fbeta_score=',(y_true, y_pred, average='micro', beta=beta))
+            if pred[1] < 1.0:
+                criteria_pred=0.0
+            if (pred[1]>=1.0) and (pred[1]<=1.6):
+                if pred[2] > 20:
+                    criteria_pred=(pred[1]-1.0)*(5.0/3.0)
+                if pred[2]<= 20:
+                    criteria_pred=0.0
+
+        if pred[0]<= 0:
+            criteria_pred = 0.0
+
+        print('groundtruth:(n_source_im, mag_eff, n_pix_source,e_radius)=',truth[0],truth[1],truth[2],truth[3])
+        print('prediction :(n_source_im, mag_eff, n_pix_source,e_radius)=',pred[0],pred[1],pred[2],pred[3])
+        print('~~~~~criteria~~~~~(ground truth,prediction)=',criteria_tru,criteria_pred)
+        #'''
+
+        #'''
+        for j in range(6):
+            if criteria_tru>=threshold[j]:
+                y_true[j,int(batch_idx*glo_batch_size+i)]=1
+            if criteria_pred>=threshold[j]:
+                y_pred[j,int(batch_idx*glo_batch_size+i)]=1
+
+        #'''
+
+        ##criteria_target_list.append(criteria_tru)
+        ##criteria_output_list.append(criteria_pred)
+
+        #print("______")
+
+'''
+def fbeta_score(y_true, y_pred, beta, threshold, eps=1e-9):
+    beta2 = beta**2
+
+    y_pred = torch.ge(y_pred.float(), threshold).float()
+    y_true = y_true.float()
+
+    true_positive = (y_pred * y_true).sum(dim=1)
+    precision = true_positive.div(y_pred.sum(dim=1).add(eps))
+    recall = true_positive.div(y_true.sum(dim=1).add(eps))
+
+    return torch.mean(
+        (precision*recall).
+        div(precision.mul(beta2) + recall + eps).
+        mul(1 + beta2))
+
+
+py_pred = torch.from_numpy(np.array([criteria_output_list]))
+py_true = torch.from_numpy(np.array([criteria_target_list]))
+
+
+
+print('fbeta_score=',fbeta_score(py_true, py_pred,beta=0.001,threshold=0.80),'beta,threshold=0.001,0.80')
+print('fbeta_score=',fbeta_score(py_true, py_pred,beta=0.001,threshold=0.90),'beta,threshold=0.001,0.90')
+print('fbeta_score=',fbeta_score(py_true, py_pred,beta=0.001,threshold=0.99),'beta,threshold=0.001,0.99')
+
+print('fbeta_score=',fbeta_score(py_true, py_pred,beta=0.01,threshold=0.80),'beta,threshold=0.01,0.80')
+print('fbeta_score=',fbeta_score(py_true, py_pred,beta=0.01,threshold=0.90),'beta,threshold=0.01,0.90')
+print('fbeta_score=',fbeta_score(py_true, py_pred,beta=0.01,threshold=0.99),'beta,threshold=0.01,0.99')
+'''
+
+print('fbeta_score=',fbeta_score(y_true[0],y_pred[0],average='macro',beta=0.001),';beta,threshold=0.001,0.80')
+print('fbeta_score=',fbeta_score(y_true[1],y_pred[1],average='macro',beta=0.001),';beta,threshold=0.001,0.90')
+print('fbeta_score=',fbeta_score(y_true[2],y_pred[2],average='macro',beta=0.001),';beta,threshold=0.001,0.99')
+
+print('fbeta_score=',fbeta_score(y_true[3],y_pred[3],average='macro',beta=0.01),';beta,threshold=0.01,0.80')
+print('fbeta_score=',fbeta_score(y_true[4],y_pred[4],average='macro',beta=0.01),';beta,threshold=0.01,0.90')
+print('fbeta_score=',fbeta_score(y_true[5],y_pred[5],average='macro',beta=0.01),';beta,threshold=0.01,0.99')
+
+print(y_true.shape)
+print(y_pred.shape)
+print(y_true)
+print(y_pred)
