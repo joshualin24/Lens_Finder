@@ -41,8 +41,8 @@ root_folder = "/media/joshua/HDD_fun2/Public/"
 save_model_path = './saved_model/'
 
 
-EPOCH = 100
-glo_batch_size = 50
+EPOCH = 200
+glo_batch_size = 30
 test_num_batch = 50
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
@@ -94,6 +94,7 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         # lens_data = fits.open(filepath)
         # img = lens_data[0].data
         image = np.zeros((4, 224, 224))
+        rotation_seed = np.random.randint(low=0, high = 4)
         try:
             for i, channel in enumerate(channel_names):
 
@@ -101,6 +102,7 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
                 lens_data = fits.open(filepath)
                 img = lens_data[0].data
                 img *= 10e8
+                img = np.rot90(img, rotation_seed)
                 img_channel_0 = scipy.ndimage.zoom(img, 224/img.shape[0], order=1)
                 image[i, :, :] += img_channel_0
         except:
