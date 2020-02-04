@@ -181,6 +181,9 @@ if __name__ == '__main__':
 
             loss.backward()
             optimizer.step()
+
+            del target
+            del data
             gc.collect()
             # if batch_idx % 2 == 0 and batch_idx != 0:
             #     #tb.add_scalar('test_loss', loss.item())
