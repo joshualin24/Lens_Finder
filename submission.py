@@ -28,8 +28,8 @@ from astropy.table import Table
 import datetime
 
 
-root_folder = "/media/joshua/HDD_fun2/Public/"
-loaded_model_path = './saved_model/2019-12-25criteria_resnet18.mdl'
+root_folder = "/media/joshua/HDD_fun2/Lens_finder_test/Public/"
+loaded_model_path = './saved_model/2020-01-27criteria_resnet18.mdl'
 # EHT_test_path = root_folder + test_folder
 # files = os.listdir(EHT_test_path)
 #loaded_model_path = './saved_model/flux_resnet18.mdl'
