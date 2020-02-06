@@ -29,6 +29,8 @@ from astropy import units as u
 from sklearn.model_selection import train_test_split
 from shutil import copyfile
 import os, sys
+import gc
+import datetime
 
 
 root_folder = "/media/joshua/HDD_fun2/Lens_finder_test/Public/"
@@ -67,10 +69,10 @@ Einstein_Radius_list = []
 count = 0
 for ID in df_Einstein_selected['ID']:
     count += 1
-    print("score", df_Einstein_selected[df_Einstein_selected['ID']==ID].score.values[0])
+    #print("score", df_Einstein_selected[df_Einstein_selected['ID']==ID].score.values[0])
     image = np.zeros((4, 224, 224))
     channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']
-    plt.figure(figsize=(20, 5))
+    #plt.figure(figsize=(20, 5))
     for i, channel in enumerate(channel_names):
         filepath = root_folder + channel + "/image" + channel + "-" + str(ID) + ".fits"
         lens_data = fits.open(filepath)
@@ -82,14 +84,20 @@ for ID in df_Einstein_selected['ID']:
 
     ### flux output
     blind_output = net(blind_image)
-    print("blind_output", blind_output.data.cpu().numpy()[0][0])
+    #print("blind_output", blind_output.data.cpu().numpy()[0][0])
     ID_list.append(ID)
-    Einstein_Radius_list.append(blind_output.data.cpu().numpy()[0][0])
-    if count > 10:
-        break
+    Einstein_Radius_list.append(blind_output.data.cpu().numpy()[0][0]/ (np.pi**0.5) )
+    if count % 200 == 0:
+        print("count", count)
+    #     break
+    gc.collect()
 
 
 df_Einstein = pd.DataFrame()
 df_Einstein['ID'] = ID_list
 df_Einstein['Einstein_Radius'] = Einstein_Radius_list
 print(df_Einstein.head())
+
+
+datetime_today = str(datetime.date.today())
+df_Einstein.to_csv(datetime_today +  "Einstein_Radius_submission.csv")
