@@ -27,7 +27,7 @@ from astropy.table import Table
 from sklearn.metrics import fbeta_score
 
 root_folder = "/home/zjin16/Strong_Lens_Finder/data/Public/"
-loaded_model_path = './saved_model/2020-01-27im_mag_eff_pix_einradius_resnet18.mdl'
+loaded_model_path = './saved_model/2020-02-04im_mag_eff_pix_einradius_resnet18.mdl'
 
 
 
@@ -81,7 +81,6 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         n_pix_source = self.df['n_pix_source'].iloc[[index]]
 
         ein_radius = self.df['ein_area'].iloc[[index]]
-        ein_radius.values[0] = np.sqrt(ein_radius.values[0]/np.pi)
         #print(mag_eff.values)
         #print(mag_eff.values.shape)
         if np.isnan(mag_eff.values[0])==True:
@@ -92,6 +91,8 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
             n_pix_source.values[0] = 0.0
         if np.isnan(ein_radius.values[0])==True:
             ein_radius.values[0] = 0.0
+
+        ein_radius.values[0] = np.sqrt(ein_radius.values[0]/np.pi)*1.0e6
 
         #print('ground truth:(n_source_im, mag_eff)=',n_source_im.values[0],mag_eff.values[0])
         channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']

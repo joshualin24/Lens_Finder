@@ -27,7 +27,7 @@ from astropy.table import Table
 from sklearn.metrics import fbeta_score
 
 root_folder = "/home/zjin16/Strong_Lens_Finder/data/Public/"
-loaded_model_path = './saved_model/2020-01-28einradius_resnet18_lastest.mdl'
+loaded_model_path = './saved_model/2020-02-06einradius_resnet18_lastest.mdl'
 
 
 
@@ -72,9 +72,10 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         ID = self.df['ID'].iloc[[index]]
 
         ein_radius = self.df['ein_area'].iloc[[index]]
-        ein_radius.values[0] = np.sqrt(ein_radius.values[0]/np.pi)
         if np.isnan(ein_radius.values[0])==True:
             ein_radius.values[0] = 0.0
+
+        ein_radius.values[0] = np.sqrt(ein_radius.values[0]/np.pi)*1.0e6  #rad*1.0e6
 
         #print('ground truth:(n_source_im, mag_eff)=',n_source_im.values[0],mag_eff.values[0])
         channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']
@@ -115,8 +116,8 @@ test_loader = torch.utils.data.DataLoader(LensDataset(root_folder, train=False, 
 
 net.cuda()
 
-criteria_target_list = []
-criteria_output_list = []
+truth_array = np.zeros(20000)
+pred_array = np.zeros(20000)
 
 
 for batch_idx, (data, ID, y) in enumerate(test_loader):
@@ -137,7 +138,25 @@ for batch_idx, (data, ID, y) in enumerate(test_loader):
         truth=target.data.cpu().numpy()[i]
         pred=output.data.cpu().numpy()[i]
 
+        truth=truth/1.0e6*(180/np.pi)*3600
+        pred=pred/1.0e6*(180/np.pi)*3600
+
+        truth_array[int(batch_idx*glo_batch_size+i)]=truth
+        pred_array[int(batch_idx*glo_batch_size+i)]=pred
+
         print('groundtruth:(e_radius)=',truth)
         print('prediction :(e_radius)=',pred)
 
         print("______")
+
+np.save('/home/zjin16/Lens_Finder/er_truth.npy',truth_array)
+np.save('/home/zjin16/Lens_Finder/er_pred.npy',pred_array)
+
+
+plt.scatter(truth_array,pred_array,s=0.5,c='b')
+plt.xlabel('ground truth')
+plt.ylabel('prediction')
+plt.title('Einstein radius prediction vs ground truth')
+plt.plot((0,5,8),(0,5,8),ls=':',c='r')
+
+plt.savefig('/home/zjin16/Lens_Finder/einstein_radius.png')

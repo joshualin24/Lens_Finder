@@ -41,7 +41,7 @@ save_model_path = './saved_model/'
 
 
 #EPOCH = 40
-EPOCH = 40
+EPOCH = 20
 glo_batch_size = 50
 test_num_batch = 50
 
@@ -57,10 +57,9 @@ data_transform = transforms.Compose([
             normalize,
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomVerticalFlip(p=0.5),
-            transforms.RandomRotation(45),
             ])
 target_transform = torch.Tensor
-datastd=np.array([0.915833478313607,2.4029123249358495,244.70123172849702,4.81361636626335e-06]) ##n_source_im.std,mag_eff.std,n_pix_source.std,ein_radius.std
+datastd=np.array([0.915833478313607,2.4029123249358495,244.70123172849702,4.81361636626335e-06*1.0e6]) ##n_source_im.std,mag_eff.std,n_pix_source.std,ein_radius.std
 
 
 class LensDataset(Dataset): # torch.utils.data.Dataset
@@ -88,7 +87,6 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
         n_pix_source = self.df['n_pix_source'].iloc[[index]]
 
         ein_radius = self.df['ein_area'].iloc[[index]]
-        ein_radius.values[0] = np.sqrt(ein_radius.values[0]/np.pi)
         #print(mag_eff.values)
         #print(mag_eff.values.shape)
         if np.isnan(mag_eff.values[0])==True:
@@ -99,6 +97,8 @@ class LensDataset(Dataset): # torch.utils.data.Dataset
             n_pix_source.values[0] = 0.0
         if np.isnan(ein_radius.values[0])==True:
             ein_radius.values[0] = 0.0
+
+        ein_radius.values[0] = np.sqrt(ein_radius.values[0]/np.pi)*1.0e6
 
         channel_names = ['EUC_H', 'EUC_J', 'EUC_Y', 'EUC_VIS']
         y=np.array([n_source_im.values[0], mag_eff.values[0],n_pix_source.values[0],ein_radius.values[0]])
